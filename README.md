@@ -1,17 +1,18 @@
 # Proof-Flow
 
-A deterministic causal reduction system with replay equivalence and consensus-compatible execution.
+**Deterministic causal reduction system for verifiable event-sourced state**
 
-**Based on:** [Proof-Flow Formal Operational Semantics v1.0](./FORMAL_SEMANTICS.md)
+A TypeScript/Node.js implementation of the formal operational semantics defined in the Proof-Flow specification. All execution is deterministic, replayable, and formally verifiable.
 
 ## Features
 
-- **Deterministic Execution**: Pure reducers with no side effects
-- **Causal Event Streams**: Immutable events forming a DAG with causal ordering
-- **Replay Equivalence**: Verify execution consistency across replays
-- **State Commitment**: SHA256 hashing for consensus
-- **CLI Tool**: Execute events, inspect state, replay history
-- **TypeScript**: Full type safety
+✨ **Deterministic Execution** - Pure reducers with canonical state  
+🔗 **Causal Event Streams** - Immutable events with causal ordering  
+🎯 **Replay Equivalence** - Verify determinism through replay  
+🔐 **State Hashing** - SHA256 commitments for state verification  
+📊 **Execution History** - Complete audit trail of all state transitions  
+🎮 **Interactive CLI** - Query, emit events, verify system properties  
+📦 **TypeScript** - Full type safety and IDE support  
 
 ## Installation
 
@@ -19,252 +20,305 @@ A deterministic causal reduction system with replay equivalence and consensus-co
 npm install proof-flow
 ```
 
-Or globally for CLI:
+Or use the CLI:
 
 ```bash
 npm install -g proof-flow
+proof-flow
 ```
 
 ## Quick Start
 
-### CLI Usage
-
-Initialize a project:
-
-```bash
-proof-flow init
-```
-
-Execute an event:
-
-```bash
-proof-flow exec INCREMENT '{"amount": 1}'
-```
-
-Check status:
-
-```bash
-proof-flow status
-```
-
-View event log:
-
-```bash
-proof-flow log
-```
-
-Replay and verify:
-
-```bash
-proof-flow replay
-```
-
 ### Programmatic Usage
 
 ```typescript
-import {
-  ProofFlowEngine,
-  ReducerRegistry,
-  ImmutableEvent
-} from 'proof-flow';
+import { ProofFlow } from 'proof-flow';
 
-// Create a reducer registry
-const registry = new ReducerRegistry();
+// Initialize with canonical initial state
+const pf = new ProofFlow({ counter: 0, name: 'app' });
 
-registry.register('INCREMENT', (state, event) => ({
+// Register reducers (pure functions)
+pf.on('INCREMENT', (state: any, event) => ({
   ...state,
-  count: (state.count || 0) + event.payload.amount
+  counter: state.counter + event.payload.amount,
 }));
 
-// Create the engine with initial state
-const engine = new ProofFlowEngine({ count: 0 }, registry);
+pf.on('SET_NAME', (state: any, event) => ({
+  ...state,
+  name: event.payload.name,
+}));
 
-// Create and execute an event
-const event = new ImmutableEvent({
-  id: 'event-1',
-  type: 'INCREMENT',
-  payload: { amount: 5 },
-  timestamp: Date.now(),
-  epoch: 0
-});
+// Emit events
+pf.emit({ type: 'INCREMENT', payload: { amount: 1 } });
+pf.emit({ type: 'SET_NAME', payload: { name: 'my-app' } });
 
-const result = engine.execute(event);
+// Query state
+console.log(pf.getState());
+// { counter: 1, name: 'my-app' }
 
-console.log(result.state);      // { count: 5 }
-console.log(result.stateHash);  // SHA256 hash
-console.log(result.eventCount); // 1
+// Get state hash for commitment
+console.log(pf.getStateHash());
+// abc123...
 
 // Verify replay equivalence
-const isConsistent = engine.verifyReplayEquivalence();
-console.log(isConsistent); // true
+const isValid = pf.verifyReplay();
+console.log(isValid); // true
 ```
 
-## Core Concepts
+### CLI Usage
+
+```bash
+$ proof-flow
+
+🚀 Proof-Flow CLI - Deterministic Causal Reduction System
+
+Enter system name (default: proof-flow): my-system
+Enter initial state (JSON): {"counter": 0}
+
+✅ System 'my-system' initialized
+
+📊 System Info:
+   Name: my-system
+   Events: 0
+   State Hash: abc123...
+   Epoch: 0
+
+proof-flow> reducer
+Event type: INCREMENT
+Reducer function: state.counter += event.payload.amount; return state;
+✅ Registered reducer for 'INCREMENT'
+
+proof-flow> emit
+Event type: INCREMENT
+Event payload (JSON): {"amount": 5}
+✅ Event emitted
+State hash: def456...
+
+proof-flow> state
+📦 Current State:
+{
+  "counter": 5
+}
+
+proof-flow> verify
+✅ Replay verification passed - system is deterministic
+```
+
+## API Reference
+
+### ProofFlow
+
+Main class for managing a deterministic reduction system.
+
+#### `new ProofFlow(initialState, name?)`
+
+Create a new Proof-Flow system.
+
+```typescript
+const pf = new ProofFlow({ count: 0 }, 'myapp');
+```
+
+#### `on(eventType, reducer, epoch?)`
+
+Register a reducer for an event type.
+
+```typescript
+pf.on('INCREMENT', (state, event) => ({
+  ...state,
+  count: state.count + 1,
+}));
+```
+
+#### `emit(event)`
+
+Emit an event and execute its reducer.
+
+```typescript
+const snapshot = pf.emit({
+  type: 'INCREMENT',
+  payload: { amount: 5 },
+});
+```
+
+#### `getState()`
+
+Get current state.
+
+```typescript
+const state = pf.getState();
+```
+
+#### `getStateHash()`
+
+Get SHA256 hash of current state for commitment.
+
+```typescript
+const hash = pf.getStateHash(); // '5ab3...'
+```
+
+#### `getEvents()`
+
+Get all emitted events in causal order.
+
+```typescript
+const events = pf.getEvents();
+```
+
+#### `getHistory()`
+
+Get execution snapshots showing state evolution.
+
+```typescript
+const history = pf.getHistory();
+history.forEach(snap => {
+  console.log(`State hash: ${snap.stateHash}, Event count: ${snap.eventCount}`);
+});
+```
+
+#### `verifyReplay()`
+
+Verify replay equivalence theorem - ensures determinism.
+
+```typescript
+if (pf.verifyReplay()) {
+  console.log('System is deterministic ✅');
+}
+```
+
+#### `getInfo()`
+
+Get system metadata.
+
+```typescript
+const info = pf.getInfo();
+// { name: 'myapp', eventCount: 5, stateHash: '5ab3...', epoch: 0 }
+```
 
 ### Canonicalization
 
-All state must be canonical (deterministically serializable):
+Core determinism guarantee.
+
+#### `Canonicalization.serialize(state)`
+
+Serialize state to canonical byte representation.
 
 ```typescript
-import { canonicalize, stateHash } from 'proof-flow';
-
-const state = { b: 2, a: 1 };
-const canonical = canonicalize(state); // { a: 1, b: 2 }
-const hash = stateHash(state);         // SHA256 hash
+const bytes = Canonicalization.serialize(state);
 ```
 
-### Events
+#### `Canonicalization.hash(state)`
 
-Immutable events with causal ordering:
+Compute SHA256 hash of canonical state.
 
 ```typescript
-import { ImmutableEvent } from 'proof-flow';
-
-const event = new ImmutableEvent({
-  id: 'event-123',
-  type: 'USER_CREATED',
-  payload: { name: 'Alice' },
-  timestamp: Date.now(),
-  prevHash: previousEventHash, // Causal link
-  epoch: 1
-});
-
-const hash = event.hash; // Automatically computed
+const hash = Canonicalization.hash(state);
 ```
 
-### Reducers
+#### `Canonicalization.isCanonical(state)`
 
-Pure functions that evolve state:
-
-```typescript
-import { createReducer } from 'proof-flow';
-
-const counterReducer = createReducer((state, event) => ({
-  ...state,
-  counter: (state.counter || 0) + event.payload.amount
-}));
-
-const registry = new ReducerRegistry();
-registry.register('ADD', counterReducer);
-```
-
-### Execution
-
-Deterministic reduction with verification:
+Check if state is canonical.
 
 ```typescript
-// Single event
-const result1 = engine.execute(event);
-
-// Sequence of events
-const result2 = engine.executeSequence([event1, event2, event3]);
-
-// Replay from initial state
-const result3 = engine.replay();
-
-// Verify replay equivalence (core safety property)
-const isValid = engine.verifyReplayEquivalence();
+if (Canonicalization.isCanonical(state)) {
+  console.log('State is valid');
+}
 ```
 
 ## Formal Semantics
 
-This implementation follows the formal semantics defined in **Proof-Flow Formal Operational Semantics v1.0**.
+Proof-Flow implements the formal operational semantics from the specification:
 
-Key invariants:
+- **Canonical State**: All state is deterministically serializable as UTF-8 JSON with ordered keys
+- **Event Streams**: Immutable events form a causal DAG with prevHash linking
+- **Reducers**: Pure, total, deterministic functions F: (S, E) → S
+- **Execution**: Recursive reducer application over event sequence
+- **Replay Equivalence**: Exec(S₀, Σ) = Replay(S₀, Σ) verified automatically
+- **State Commitment**: SHA256(canonical(state)) for verifiable commitments
 
-- **Core Reduction**: `S_{t+1} = F(S_t, E_t)`
-- **Replay Equivalence**: `Exec(S_0, Σ) = Replay(S_0, Σ)`
-- **State Hash**: `H_s(S) = SHA256(Canonical(S))`
-- **Causal Ordering**: `E_i ≺ E_j iff E_j.prevHash = H(E_i)`
+## Constraints & Rules
 
-## API Reference
+### Reducer Purity
 
-### ProofFlowEngine
-
-```typescript
-class ProofFlowEngine<S> {
-  constructor(initialState: S, registry: ReducerRegistry<S>);
-  
-  // Execute single event
-  execute(event: ImmutableEvent): ExecutionResult<S>;
-  
-  // Execute sequence
-  executeSequence(events: ImmutableEvent[]): ExecutionResult<S>;
-  
-  // Replay from initial state
-  replay(): ExecutionResult<S>;
-  
-  // Verify replay equivalence
-  verifyReplayEquivalence(): boolean;
-  
-  // State access
-  getState(): S;
-  getStateHash(): string;
-  getEvents(): CausalEventStream;
-  getExecutionLog(): Array<...>;
-  
-  // Consensus
-  wouldFork(otherStateHash: string): boolean;
-}
-```
-
-### ReducerRegistry
+Reducers MUST NOT:
+- Mutate external state
+- Access nondeterministic clocks
+- Use random entropy
+- Depend on runtime-local memory
+- Mutate inputs
 
 ```typescript
-class ReducerRegistry<S> {
-  register(eventType: string, reducer: Reducer<S>): void;
-  
-  registerWithEffects(eventType: string, reducer: ReducerWithEffects<S>): void;
-  
-  apply(state: S, event: Event): S;
-  
-  applyWithEffects(state: S, event: Event): [S, EffectIntent[]];
-}
+// ❌ WRONG - impure
+pf.on('BAD', (state) => {
+  state.counter++; // Mutation!
+  return state;
+});
+
+// ✅ RIGHT - pure
+pf.on('GOOD', (state, event) => ({
+  ...state,
+  counter: state.counter + 1,
+}));
 ```
 
-### Canonicalization
+### Canonical State
+
+State MUST NOT contain:
+- `NaN` or `Infinity`
+- `undefined` values
+- Functions or cyclic references
+- Non-deterministic types
+
+### Event Ordering
+
+Events are processed in causal order. The prevHash field maintains the causal chain:
+
+```
+Event₁ ← prevHash=0000...
+Event₂ ← prevHash=hash(Event₁)
+Event₃ ← prevHash=hash(Event₂)
+...
+```
+
+## Examples
+
+### Counter
 
 ```typescript
-function canonicalize(value: any): any;
-function isCanonical(value: any): boolean;
-function canonicalBytes(value: any): Buffer;
-function stateHash(state: any): string;
-function eventHash(event: any): string;
+const counter = new ProofFlow({ value: 0 });
+
+counter.on('INCREMENT', (s, e) => ({ value: s.value + 1 }));
+counter.on('DECREMENT', (s, e) => ({ value: s.value - 1 }));
+counter.on('RESET', (s, e) => ({ value: 0 }));
+
+counter.emit({ type: 'INCREMENT', payload: {} });
+counter.emit({ type: 'INCREMENT', payload: {} });
+counter.emit({ type: 'DECREMENT', payload: {} });
+
+console.log(counter.getState()); // { value: 1 }
 ```
 
-### Events
+### User Registry
 
 ```typescript
-class ImmutableEvent {
-  readonly id: string;
-  readonly type: string;
-  readonly payload: any;
-  readonly timestamp: number;
-  readonly prevHash?: string;
-  readonly epoch?: number;
-  readonly hash: string;
-  
-  causallyComesBefore(other: ImmutableEvent): boolean;
-}
+const users = new ProofFlow({ data: {} });
 
-class CausalEventStream {
-  add(event: ImmutableEvent): void;
-  get(id: string): ImmutableEvent | undefined;
-  all(): ImmutableEvent[];
-  topoSort(): ImmutableEvent[]; // Topological sort
-  clone(): CausalEventStream;
-}
-```
+users.on('ADD_USER', (s, e) => ({
+  data: {
+    ...s.data,
+    [e.payload.id]: { name: e.payload.name, created: e.timestamp },
+  },
+}));
 
-## CLI Commands
+users.on('REMOVE_USER', (s, e) => {
+  const { [e.payload.id]: _, ...rest } = s.data;
+  return { data: rest };
+});
 
-```
-proof-flow init              Initialize a new project
-proof-flow exec <type> <json> Execute an event
-proof-flow status            Show current state
-proof-flow log [limit]       Show event log
-proof-flow replay            Replay and verify
-proof-flow help              Show help
+users.emit({ type: 'ADD_USER', payload: { id: '1', name: 'Alice' } });
+users.emit({ type: 'ADD_USER', payload: { id: '2', name: 'Bob' } });
+
+console.log(users.getState());
+// { data: { '1': { name: 'Alice', created: 1234... }, '2': { name: 'Bob', created: 1234... } } }
 ```
 
 ## Testing
@@ -274,9 +328,9 @@ npm test
 ```
 
 
-
 ## References
 
-- [Proof-Flow Formal Operational Semantics v1.0](./FORMAL_SEMANTICS.md)
-- [Event Sourcing Pattern](https://martinfowler.com/eaaDev/EventSourcing.html)
-- [Deterministic Replay](https://en.wikipedia.org/wiki/Deterministic_Replay)
+- [Proof-Flow Formal Operational Semantics v1.0](./SEMANTICS.md)
+- Event Sourcing patterns
+- Deterministic computation
+- Causal consistency
